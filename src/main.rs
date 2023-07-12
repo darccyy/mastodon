@@ -13,5 +13,5 @@ fn main() {
         access_token,
     );
 
-    client.post_status("bruh bruh!");
+    client.post_image("./ok.png", "some caption blah blah");
 }
