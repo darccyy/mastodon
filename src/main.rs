@@ -18,6 +18,7 @@ fn main() {
     // Sort
     let mut posts: Vec<_> = posts.map(|r|r.unwrap()).collect();
     posts.sort_by_key(|dir|dir.path());
+    posts.reverse();
 
     for file in posts {
         let path = file.path();
