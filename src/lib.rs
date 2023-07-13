@@ -1,21 +1,9 @@
 use std::fmt::Display;
-use reqwest::{blocking::{Client, multipart}, header};
+use reqwest::{blocking::{Client, multipart, Response}, header};
 
 pub struct Mastodon {
     client: Client,
     instance: String,
-}
-
-macro_rules! hashmap {
-    ( $(
-        $k:expr => $v:expr
-    ),* $(,)? ) => {{
-        let mut hm = ::std::collections::HashMap::new();
-        $(
-            hm.insert($k, $v);
-        )*
-        hm
-    }}
 }
 
 /// Create `Deserialize`-able structs for JSON responses
@@ -75,20 +63,11 @@ impl Mastodon {
         format!("https://{instance}/api/v{version}/{path}", instance = self.instance)
     }
 
-    pub fn post_text(&self, text: &str) {
-        let res = self
-            .client
-            .post(&self.api_url(1, "statuses"))
-            .form(&hashmap! {
-                "status" => text,
-            })
-            .send()
-            .expect("Failed to send post request");
+    pub fn upload_media(&self, paths: &[String]) -> Vec<String> {
 
-        println!("STATUS: {:?}", res.status());
-    }
+        let mut media_ids = Vec::new();
 
-    pub fn post_image(&self, path: &str, text: &str) {
+        for path in paths {
         let form = multipart::Form::new().file("file", path).expect("Failed to build multipart form");
 
         let res = self
@@ -97,28 +76,36 @@ impl Mastodon {
             .multipart(form)
             .send()
             .expect("Failed to send post request");
+        check_status_panic(&res);
 
-        // println!("{:#?}", res);
+        let res = res.text().expect("Failed to get response text");
+        let media: MediaResponse = serde_json::from_str(&res).expect("Failed to parse response json");
 
-        println!("STATUS: {:?}", res.status());
+        media_ids.push(media.id);
+        }
 
-        let text = res.text().expect("Failed to get response text");
+        media_ids
+    }
 
-        let media: MediaResponse = serde_json::from_str(&text).expect("Failed to parse response json");
-
-        println!("MEDIA ID: {}", media.id);
-        println!("MEDIA URL: {}", media.url);
+    pub fn post_media_status(&self, text: &str, media_ids: &[String]) {
+        let json = serde_json::json!({
+            "status": text,
+            "media_ids": media_ids,
+        });
 
         let res = self
             .client
             .post(&self.api_url(1, "statuses"))
-            .form(&hashmap! {
-                "status" => text,
-                "media_ids" => format!("[{}]", media.id),
-            })
+            .json(&json)
             .send()
             .expect("Failed to send post request");
-
-        println!("STATUS: {:?}", res.status());
+        check_status_panic(&res);
     }
 }
+
+fn check_status_panic(res: &Response) {
+    if let Err(status) = res.error_for_status_ref() {
+        panic!("Unsuccessful request: {:#?}", status);
+    }
+}
+
