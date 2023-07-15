@@ -1,5 +1,8 @@
+use reqwest::{
+    blocking::{multipart, Client, Response},
+    header, StatusCode,
+};
 use std::fmt::Display;
-use reqwest::{blocking::{Client, multipart, Response}, header};
 
 pub struct Mastodon {
     client: Client,
@@ -31,7 +34,7 @@ macro_rules! json {
     };
 }
 
-json!{
+json! {
     MediaResponse {
         id: String,
         url: String,
@@ -60,28 +63,33 @@ impl Mastodon {
     }
 
     fn api_url(&self, version: u32, path: impl Display) -> String {
-        format!("https://{instance}/api/v{version}/{path}", instance = self.instance)
+        format!(
+            "https://{instance}/api/v{version}/{path}",
+            instance = self.instance
+        )
     }
 
     pub fn upload_media(&self, paths: &[String]) -> Vec<String> {
-
         let mut media_ids = Vec::new();
 
         for path in paths {
-        let form = multipart::Form::new().file("file", path).expect("Failed to build multipart form");
+            let form = multipart::Form::new()
+                .file("file", path)
+                .expect("Failed to build multipart form");
 
-        let res = self
-            .client
-            .post(&self.api_url(2, "media"))
-            .multipart(form)
-            .send()
-            .expect("Failed to send post request");
-        check_status_panic(&res);
+            let res = self
+                .client
+                .post(&self.api_url(2, "media"))
+                .multipart(form)
+                .send()
+                .expect("Failed to send post request");
+            check_status_panic(&res);
 
-        let res = res.text().expect("Failed to get response text");
-        let media: MediaResponse = serde_json::from_str(&res).expect("Failed to parse response json");
+            let res = res.text().expect("Failed to get response text");
+            let media: MediaResponse =
+                serde_json::from_str(&res).expect("Failed to parse response json");
 
-        media_ids.push(media.id);
+            media_ids.push(media.id);
         }
 
         media_ids
@@ -104,8 +112,10 @@ impl Mastodon {
 }
 
 fn check_status_panic(res: &Response) {
+    if res.status() == StatusCode::TOO_MANY_REQUESTS {
+        panic!("RATE LIMITED!!! Try again in 30m");
+    }
     if let Err(status) = res.error_for_status_ref() {
         panic!("Unsuccessful request: {:#?}", status);
     }
 }
-
