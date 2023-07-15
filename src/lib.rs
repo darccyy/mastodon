@@ -1,38 +1,10 @@
+mod json;
+
 use reqwest::{
     blocking::{multipart, Client, Response},
     header, StatusCode,
 };
-use std::fmt::Display;
-
-pub struct Mastodon {
-    client: Client,
-    instance: String,
-}
-
-/// Create `Deserialize`-able structs for JSON responses
-macro_rules! json {
-    ( $(
-       $struct:ident $tt:tt
-    )* ) => { $(
-        json!(@single $struct $tt);
-    )* };
-
-    (@single $struct:ident { $( $key:ident : $type:ty),* $(,)? } ) => {
-        /// Deserialized JSON
-        #[derive(Debug, serde::Deserialize)]
-        pub struct $struct {
-            $( pub $key: $type, )*
-        }
-    };
-
-    (@single $struct:ident ( $( $type:ty ),* $(,)? ) ) => {
-        /// Deserialized JSON
-        #[derive(Debug, serde::Deserialize)]
-        pub struct $struct (
-            $( pub $type, )*
-        );
-    };
-}
+use std::{env, fmt::Display, process};
 
 json! {
     MediaResponse {
@@ -41,7 +13,26 @@ json! {
     }
 }
 
+/// Client to Mastodon API
+pub struct Mastodon {
+    /// Reqwest client, with authorization headers
+    client: Client,
+    /// Instance domain name
+    instance: String,
+}
+
 impl Mastodon {
+    // Create client with credentials from environment
+    pub fn from_env() -> Self {
+        dotenv::dotenv().ok();
+        let instance = env::var("INSTANCE").expect("No `INSTANCE` environment variable");
+        let access_token =
+            env::var("ACCESS_TOKEN").expect("No `ACCESS_TOKEN` environment variable");
+
+        Mastodon::new(instance, access_token)
+    }
+
+    // Create new client
     pub fn new(instance: impl Into<String>, access_token: impl Display) -> Self {
         let mut headers = header::HeaderMap::new();
         headers.insert(
@@ -62,6 +53,7 @@ impl Mastodon {
         }
     }
 
+    /// Get API URL from instance and API path
     fn api_url(&self, version: u32, path: impl Display) -> String {
         format!(
             "https://{instance}/api/v{version}/{path}",
@@ -69,6 +61,9 @@ impl Mastodon {
         )
     }
 
+    /// Upload media
+    ///
+    /// Does not post a status
     pub fn upload_media(&self, paths: &[String]) -> Vec<String> {
         let mut media_ids = Vec::new();
 
@@ -95,6 +90,7 @@ impl Mastodon {
         media_ids
     }
 
+    /// Post a status with already-uploaded media, given ids
     pub fn post_media_status(&self, text: &str, media_ids: &[String]) {
         let json = serde_json::json!({
             "status": text,
@@ -111,10 +107,13 @@ impl Mastodon {
     }
 }
 
+/// Panic if fetch response is not successful
 fn check_status_panic(res: &Response) {
     if res.status() == StatusCode::TOO_MANY_REQUESTS {
-        panic!("RATE LIMITED!!! Try again in 30m");
+        println!("<<< RATE LIMITED!!! Try again in 30m >>>");
+        process::exit(1);
     }
+
     if let Err(status) = res.error_for_status_ref() {
         panic!("Unsuccessful request: {:#?}", status);
     }

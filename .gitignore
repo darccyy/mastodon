@@ -1,3 +1,5 @@
 /target
 /posts
 .env
+outbox.fmt.json
+posts.json

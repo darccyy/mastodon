@@ -1,59 +1,80 @@
-use std::{env, fs};
+use std::fs;
 
-use mastodon::Mastodon;
+// use mastodon::Mastodon;
+use mastodon::json;
+
+json! {
+    OutboxFile {
+        orderedItems: Vec<OrderedItem>,
+    }
+    OrderedItem {
+        id: String,
+        r#type: String,
+        object: Object,
+    }
+    Object {
+        content: String,
+        replies: Replies,
+        attachment: Vec<Attachment>,
+    }
+    Replies {
+        id: String
+    }
+    Attachment {
+        url: String,
+    }
+}
+
+#[derive(Debug)]
+struct Post {
+    id: String,
+    caption: String,
+    media_urls: Vec<String>,
+    replies_url: String,
+}
 
 fn main() {
-    dotenv::dotenv().ok();
+    // let client = Mastodon::from_env();
 
-    let instance = env::var("INSTANCE").expect("No `INSTANCE` environment variable");
-    let access_token = env::var("ACCESS_TOKEN").expect("No `ACCESS_TOKEN` environment variable");
+    let file = fs::read_to_string("outbox.fmt.json").expect("read file");
 
-    let client = Mastodon::new(
-        instance,
-        access_token,
-    );
+    let json: OutboxFile = serde_json::from_str(&file).expect("parse json");
 
-    let posts = fs::read_dir("./posts/next").expect("Failed to read posts folder");
+    // println!("{:?}", json);
 
-    // Sort
-    let mut posts: Vec<_> = posts.map(|r|r.unwrap()).collect();
-    posts.sort_by_key(|dir|dir.path());
-    posts.reverse();
+    let mut posts = Vec::new();
 
-    for file in posts {
-        let path = file.path();
-        let path = path.to_string_lossy().to_string();
-        println!("path: {}", path);
+    for item in json.orderedItems {
+        let id = item.id;
+        let caption = item.object.content;
+        let replies_url = item.object.replies.id;
 
+        let caption = caption
+            .split("<a href=\"https://mastodon.world/tags")
+            .next()
+            .map(ToString::to_string)
+            .unwrap_or(caption);
 
-        let caption = fs::read_to_string(path.to_string() + "/caption.txt").expect("Failed to read caption file in post");
+        let media_urls: Vec<_> = item
+            .object
+            .attachment
+            .into_iter()
+            .map(|att| format!("https://s3.eu-central-2.wasabisys.com{}", att.url))
+            .collect();
 
-        let caption = caption.replace("\n\n", "\n");
-        let caption = caption.replace("\n💚 amu lasagnon 💚", "");
-        let caption = caption + " #bot";
-        println!("caption: {}", caption);
-
-        let mut image_paths = Vec::new();
-        let images = fs::read_dir(path.to_string() + "/images").expect("Failed to read images folder in post");
-        for image in images.flatten() {
-            let image_path = image.path();
-            let image_path = image_path.to_string_lossy().to_string();
-
-            image_paths.push(image_path);
+        if media_urls.is_empty() {
+            continue;
         }
 
-        println!("post medias: {:?}", image_paths);
-        let media_ids = client.upload_media(&image_paths);
-        println!("SUCCESS!");
-
-        println!("media ids: {:?}", media_ids);
-        client.post_media_status(&caption, &media_ids);
-        println!("SUCCESS!");
-
-        println!("move to: {}", path.replace("/next", "/done"));
-        fs::rename(path.to_string(), path.replace("/next", "/done")).expect("Failed to move post folder into done directory");
-
-        println!(" === SUCCESS! === ");
+        posts.push(Post {
+            id,
+            caption,
+            media_urls,
+            replies_url,
+        });
     }
 
+    let json = format!("{:#?}", posts);
+
+    fs::write("posts.json", json).expect("write file");
 }
