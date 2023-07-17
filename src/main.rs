@@ -30,7 +30,6 @@ struct Post {
     id: String,
     caption: String,
     media_urls: Vec<String>,
-    replies_url: String,
 }
 
 fn main() {
@@ -47,7 +46,15 @@ fn main() {
     for item in json.orderedItems {
         let id = item.id;
         let caption = item.object.content;
-        let replies_url = item.object.replies.id;
+
+        let id = id
+            .split("https://mastodon.world/users/garfieldeo/statuses/")
+            .nth(1)
+            .unwrap()
+            .split("/")
+            .next()
+            .unwrap()
+            .to_string();
 
         let caption = caption
             .split("<a href=\"https://mastodon.world/tags")
@@ -70,11 +77,35 @@ fn main() {
             id,
             caption,
             media_urls,
-            replies_url,
         });
     }
 
-    let json = format!("{:#?}", posts);
+    fs::write("posts2.json", format!("{:?}", posts)).expect("write file");
 
-    fs::write("posts.json", json).expect("write file");
+    let mut output = Vec::new();
+
+    for post in posts {
+        let Post {
+            id,
+            caption,
+            media_urls,
+        } = post;
+
+        output.push(
+            "{".to_string()
+                + "\n"
+                + &format!(r#"    "id": "{id}""#)
+                + "\n"
+                + &format!(r#"    "caption": "{caption}""#)
+                + "\n"
+                + &format!(r#"    "media_urls": ["{}"]"#, media_urls.join("\", \""))
+                + "\n"
+                + &format!(r#"    "replies": [  ]"#)
+                + "\n"
+                + "}",
+        );
+    }
+
+    let output = output.join(",\n");
+    fs::write("posts.json", format!("[\n{}\n]", output)).expect("write file");
 }
