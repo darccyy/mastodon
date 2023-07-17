@@ -13,6 +13,13 @@ json! {
     }
 }
 
+json! {
+    StatusResponse {
+        id: String,
+        content: String,
+    }
+}
+
 /// Client to Mastodon API
 pub struct Mastodon {
     /// Reqwest client, with authorization headers
@@ -103,6 +110,32 @@ impl Mastodon {
             .json(&json)
             .send()
             .expect("Failed to send post request");
+        check_status_panic(&res);
+    }
+
+
+    /// Get all posted statuses
+    pub fn get_statuses(&self, account_id: &str) -> Vec<StatusResponse> {
+        let res = self
+            .client
+            .get(&self.api_url(1, &format!("accounts/{account_id}/statuses")))
+            .send()
+            .expect("Failed to send get request");
+        check_status_panic(&res);
+
+        let text = res.text().expect("response text");
+        let posts: Vec<StatusResponse> = serde_json::from_str(&text).expect("response json");
+
+        posts
+    }
+
+    /// Delete existing status
+    pub fn delete_status(&self, status_id: &str) {
+        let res = self
+            .client
+            .delete(&self.api_url(1, &format!("statuses/{status_id}")))
+            .send()
+            .expect("Failed to send delete request");
         check_status_panic(&res);
     }
 }
