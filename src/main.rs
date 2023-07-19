@@ -53,10 +53,12 @@ fn get_caption(post: &Post) -> String {
     }
 
     caption += "\n#esperanto #garfield";
-    if is_old_index(&post.index) {
-        caption += " (malnova)";
-    }
+
     caption += &format!(" [{}]", post.index);
+
+    if is_old_index(&post.index) {
+        caption += " (aĝa)";
+    }
 
     caption
 }
