@@ -143,7 +143,7 @@ impl Mastodon {
 /// Panic if fetch response is not successful
 fn check_status_panic(res: &Response) {
     if res.status() == StatusCode::TOO_MANY_REQUESTS {
-        println!("<<< RATE LIMITED!!! Try again in 30m >>>");
+        println!("\n\x1b[2;33m<<< \x1b[1mRATE LIMITED!!! Try again in 30m\x1b[0;2;33m >>>\x1b[0m\n");
         process::exit(1);
     }
 

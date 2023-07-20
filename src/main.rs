@@ -31,10 +31,8 @@ fn main() {
         println!("    SUCCESS!");
 
         let new_path = path.replace("/next", "/done");
-        println!("--> move to: {}", new_path);
+        println!("move to: {}", new_path);
         fs::rename(path.to_string(), new_path).expect("move folder");
-        println!("    SUCCESS!");
-
         println!("=================");
         println!();
     }
