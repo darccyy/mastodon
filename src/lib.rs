@@ -72,6 +72,8 @@ impl Mastodon {
     ///
     /// Does not post a status
     pub fn upload_media(&self, paths: &[String]) -> Vec<String> {
+        assert_eq!(paths.len(), 2);
+
         let mut media_ids = Vec::new();
 
         for path in paths {
@@ -99,6 +101,8 @@ impl Mastodon {
 
     /// Post a status with already-uploaded media, given ids
     pub fn post_media_status(&self, text: &str, media_ids: &[String]) {
+        assert_eq!(media_ids.len(), 2);
+
         let json = serde_json::json!({
             "status": text,
             "media_ids": media_ids,
@@ -112,7 +116,6 @@ impl Mastodon {
             .expect("Failed to send post request");
         check_status_panic(&res);
     }
-
 
     /// Get all posted statuses
     pub fn get_statuses(&self, account_id: &str) -> Vec<StatusResponse> {
@@ -143,7 +146,9 @@ impl Mastodon {
 /// Panic if fetch response is not successful
 fn check_status_panic(res: &Response) {
     if res.status() == StatusCode::TOO_MANY_REQUESTS {
-        println!("\n\x1b[2;33m<<< \x1b[1mRATE LIMITED!!! Try again in 30m\x1b[0;2;33m >>>\x1b[0m\n");
+        println!(
+            "\n\x1b[2;33m<<< \x1b[1mRATE LIMITED!!! Try again in 30m\x1b[0;2;33m >>>\x1b[0m\n"
+        );
         process::exit(1);
     }
 

@@ -21,6 +21,11 @@ fn main() {
         let caption = get_caption(&post);
         println!("{caption}");
 
+        // println!("==> PRESS ENTER TO CONTINUE!");
+        // let mut line = String::new();
+        // std::io::stdin().read_line(&mut line).unwrap();
+        // println!("posting...");
+
         let image_paths = read_image_paths(&path);
         println!("--> media paths: {:?}", image_paths);
         let media_ids = client.upload_media(&image_paths);
@@ -39,31 +44,10 @@ fn main() {
 }
 
 fn get_caption(post: &Post) -> String {
-    let title = post.title.trim().to_string();
-
-    let mut caption = title + " 💚";
-
-    if !post.errata.is_empty() {
-        caption += "\nEraroj:";
-        for (bad, good) in &post.errata {
-            caption += &format!("\n - '{}' -> '{}'", upper_first(&bad), upper_first(&good));
-        }
-    }
-
-    caption += "\n#esperanto #garfield";
-
-    caption += &format!(" [{}]", post.index);
-
-    if is_old_index(&post.index) {
-        caption += " (aĝa)";
-    }
-
-    caption
-}
-
-fn is_old_index(index: &str) -> bool {
-    let number: u32 = index.parse().expect("index not a number");
-    number < 100
+    format!(
+        "{} 💚\n\n#esperanto #garfield #mondodakomiksoj [{}]",
+        post.title.trim(), post.index
+    )
 }
 
 fn read_image_paths(path: &str) -> Vec<String> {
@@ -79,20 +63,10 @@ fn read_image_paths(path: &str) -> Vec<String> {
     }
 }
 
-fn upper_first(string: &str) -> String {
-    let mut chars = string.chars();
-    let Some(first) = chars.next() else {
-        return String::new();
-    };
-    first.to_string().to_uppercase() + chars.as_str()
-}
-
 #[derive(Debug, Serialize)]
 pub struct Post {
     index: String,
     title: String,
-    errata: Vec<(String, String)>,
-    english: bool,
 }
 
 fn parse_posts() -> Vec<Post> {
@@ -110,38 +84,17 @@ fn parse_posts() -> Vec<Post> {
         let title = format!("{path}/title");
         let title = fs::read_to_string(&title).expect("read title file");
 
-        let errata = format!("{path}/errata");
-        let errata = if Path::new(&errata).exists() {
-            parse_errata(fs::read_to_string(&errata).expect("read errata file"))
-        } else {
-            Vec::new()
-        };
-
+        assert!(!Path::new(&format!("{path}/errata")).exists());
         assert!(Path::new(&format!("{path}/esperanto.png")).exists());
-
-        let english = Path::new(&format!("{path}/english.png")).exists();
+        assert!(Path::new(&format!("{path}/english.png")).exists());
 
         posts.push(Post {
             index,
             title,
-            errata,
-            english,
         });
     }
 
     posts.sort_by_key(|post| post.index.parse::<u32>().expect("parse index"));
 
     posts
-}
-
-fn parse_errata(file: String) -> Vec<(String, String)> {
-    file.lines()
-        .map(|line| {
-            let mut split = line.split(">>");
-            (
-                split.next().expect("parse errata").trim().to_string(),
-                split.next().expect("parse errata").trim().to_string(),
-            )
-        })
-        .collect()
 }
